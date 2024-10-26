@@ -241,3 +241,51 @@ int usb_create_sysfs_dev_files(struct usb_device* udev)
 
     return 0;
 }
+
+#define usb_intf_attr(field, format_string)                               \
+    static ssize_t field##_show(struct device_attribute* attr, char* buf, \
+                                size_t size)                              \
+    {                                                                     \
+        struct usb_interface* intf = attr->cb_data;                       \
+                                                                          \
+        return snprintf(buf, size, format_string,                         \
+                        intf->cur_altsetting->desc.field);                \
+    }
+
+usb_intf_attr(bInterfaceNumber, "%02x\n");
+usb_intf_attr(bAlternateSetting, "%2d\n");
+usb_intf_attr(bNumEndpoints, "%02x\n");
+usb_intf_attr(bInterfaceClass, "%02x\n");
+usb_intf_attr(bInterfaceSubClass, "%02x\n");
+usb_intf_attr(bInterfaceProtocol, "%02x\n");
+
+int usb_create_sysfs_intf_files(struct usb_interface* intf)
+{
+    struct device_attribute attr;
+
+    dm_init_device_attr(&attr, intf->dev_id, "bInterfaceNumber",
+                        SF_PRIV_OVERWRITE, intf, bInterfaceNumber_show, NULL);
+    dm_async_device_attr_add(&attr);
+
+    dm_init_device_attr(&attr, intf->dev_id, "bAlternateSetting",
+                        SF_PRIV_OVERWRITE, intf, bAlternateSetting_show, NULL);
+    dm_async_device_attr_add(&attr);
+
+    dm_init_device_attr(&attr, intf->dev_id, "bNumEndpoints", SF_PRIV_OVERWRITE,
+                        intf, bNumEndpoints_show, NULL);
+    dm_async_device_attr_add(&attr);
+
+    dm_init_device_attr(&attr, intf->dev_id, "bInterfaceClass",
+                        SF_PRIV_OVERWRITE, intf, bInterfaceClass_show, NULL);
+    dm_async_device_attr_add(&attr);
+
+    dm_init_device_attr(&attr, intf->dev_id, "bInterfaceSubClass",
+                        SF_PRIV_OVERWRITE, intf, bInterfaceSubClass_show, NULL);
+    dm_async_device_attr_add(&attr);
+
+    dm_init_device_attr(&attr, intf->dev_id, "bInterfaceProtocol",
+                        SF_PRIV_OVERWRITE, intf, bInterfaceProtocol_show, NULL);
+    dm_async_device_attr_add(&attr);
+
+    return 0;
+}

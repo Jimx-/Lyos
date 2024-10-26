@@ -34,6 +34,8 @@ struct usb_host_interface {
 
 struct usb_interface {
     struct kref kref;
+    device_id_t dev_id;
+    struct usb_device* parent;
 
     struct usb_host_interface* altsetting;
     struct usb_host_interface* cur_altsetting;
@@ -284,7 +286,10 @@ int usb_set_configuration(struct usb_device* dev, int configuration);
 char* usb_cache_string(struct usb_device* udev, int index);
 
 int usb_register_device(struct usb_device* udev);
+int usb_register_interface(struct usb_interface* intf, int configuration,
+                           int ifnum);
 
 int usb_create_sysfs_dev_files(struct usb_device* udev);
+int usb_create_sysfs_intf_files(struct usb_interface* intf);
 
 #endif

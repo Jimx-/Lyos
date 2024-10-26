@@ -404,6 +404,7 @@ int usb_set_configuration(struct usb_device* dev, int configuration)
         if (!alt) alt = &intf->altsetting[0];
 
         kref_init(&intf->kref);
+        intf->parent = dev;
         intf->cur_altsetting = alt;
         usb_enable_interface(dev, intf, TRUE);
     }
@@ -424,6 +425,13 @@ int usb_set_configuration(struct usb_device* dev, int configuration)
 
     if (cp->string == NULL)
         cp->string = usb_cache_string(dev, cp->desc.iConfiguration);
+
+    for (i = 0; i < nintf; i++) {
+        struct usb_interface* intf = cp->interface[i];
+
+        usb_register_interface(intf, configuration,
+                               intf->cur_altsetting->desc.bInterfaceNumber);
+    }
 
     return 0;
 }

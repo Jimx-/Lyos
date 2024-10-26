@@ -85,6 +85,35 @@ int usb_register_device(struct usb_device* udev)
     return 0;
 }
 
+int usb_register_interface(struct usb_interface* intf, int configuration,
+                           int ifnum)
+{
+    struct usb_device* udev = intf->parent;
+    device_id_t device_id;
+    struct device_info devinf;
+    int retval;
+
+    memset(&devinf, 0, sizeof(devinf));
+
+    snprintf(devinf.name, sizeof(devinf.name), "%d-%s:%d:%d", udev->bus->busnum,
+             udev->devpath, configuration, ifnum);
+
+    devinf.bus = usb_bus_id;
+    devinf.class = NO_CLASS_ID;
+    devinf.parent = udev->dev_id;
+    devinf.devt = NO_DEV;
+
+    retval = dm_async_device_register(&devinf, &device_id);
+    if (retval) return retval;
+
+    intf->dev_id = device_id;
+
+    retval = usb_create_sysfs_intf_files(intf);
+    if (retval) return retval;
+
+    return 0;
+}
+
 static int usbd_init(void)
 {
     struct sysinfo* sysinfo;
