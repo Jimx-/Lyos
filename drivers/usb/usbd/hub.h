@@ -3,6 +3,8 @@
 
 #include <linux/usb/ch11.h>
 
+#include <libasyncdriver/libasyncdriver.h>
+
 #include "usb.h"
 
 struct usb_hub {
@@ -20,6 +22,8 @@ struct usb_hub {
 
     int maxchild;
     struct usb_device* ports[USB_MAXCHILDREN];
+
+    struct async_work events;
 };
 
 struct usb_hub* usb_create_hub(struct usb_device* hdev);

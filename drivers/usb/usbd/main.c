@@ -26,6 +26,8 @@
 
 static bus_type_id_t usb_bus_id;
 
+static struct async_work probe_work;
+
 #if CONFIG_OF
 void* boot_params;
 #endif
@@ -42,8 +44,7 @@ static const struct asyncdriver asyncdriver = {
 
 static int usbd_process_on_thread(const MESSAGE* msg)
 {
-    return msg->type != NOTIFY_MSG && msg->type != DM_REPLY &&
-           msg->type != DM_DEVICE_ATTR_SHOW;
+    return msg->type != NOTIFY_MSG;
 }
 
 int usb_register_device(struct usb_device* udev)
@@ -146,7 +147,7 @@ static void usbd_process(MESSAGE* msg)
     }
 }
 
-static void usbd_post_init(void)
+static void usbd_probe_hcd(struct async_work* work)
 {
 #if CONFIG_USB_PCI
     hcd_pci_scan();
@@ -155,6 +156,12 @@ static void usbd_post_init(void)
 #if CONFIG_USB_DWC2
     dwc2_scan();
 #endif
+}
+
+static void usbd_post_init(void)
+{
+    INIT_ASYNC_WORK(&probe_work, usbd_probe_hcd);
+    asyncdrv_enqueue_work(&probe_work);
 }
 
 int main()

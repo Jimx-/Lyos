@@ -25,6 +25,8 @@ static const char* name = "usb-hub";
 static int hub_configure(struct usb_hub* hub);
 static void hub_irq(struct urb* urb);
 
+static void hub_event(struct async_work* work);
+
 struct usb_hub* usb_create_hub(struct usb_device* hdev)
 {
     struct usb_hub* hub;
@@ -35,6 +37,7 @@ struct usb_hub* usb_create_hub(struct usb_device* hdev)
 
     hub->hdev = hdev;
     usb_get_dev(hdev);
+    INIT_ASYNC_WORK(&hub->events, hub_event);
 
     hub->maxchild = USB_MAXCHILDREN;
 
@@ -483,8 +486,9 @@ static void port_event(struct usb_hub* hub, int port1)
         hub_port_connect_change(hub, port1, portstatus, portchange);
 }
 
-static void hub_event(struct usb_hub* hub)
+static void hub_event(struct async_work* work)
 {
+    struct usb_hub* hub = list_entry(work, struct usb_hub, events);
     int i;
 
     for (i = 1; i <= hub->maxchild; i++) {
@@ -505,7 +509,7 @@ void usb_hub_handle_status_data(struct usb_hub* hub, const char* buffer,
         bits |= ((unsigned long)(buffer[i])) << (i * 8);
     hub->event_bits[0] = bits;
 
-    hub_event(hub);
+    asyncdrv_enqueue_work(&hub->events);
 }
 
 static void hub_irq(struct urb* urb) {}

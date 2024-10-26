@@ -3,16 +3,18 @@
 #include <errno.h>
 #include <lyos/const.h>
 #include <lyos/sysutils.h>
+#include <lyos/list.h>
 
 #include <libcoro/libcoro.h>
 #include <libasyncdriver/libasyncdriver.h>
 
 #include "mq.h"
+#include "work.h"
 
 #define MAX_THREADS      32
 #define WORKER_STACKSIZE ((size_t)0x4000)
 
-typedef unsigned int worker_id_t;
+#define ASYNC_WORK_THREAD 0
 
 typedef enum {
     WS_DEAD,
@@ -21,7 +23,7 @@ typedef enum {
 } worker_state_t;
 
 struct worker_thread {
-    worker_id_t id;
+    async_worker_id_t id;
     worker_state_t state;
     coro_thread_t thread;
     coro_mutex_t event_mutex;
@@ -35,6 +37,10 @@ struct worker_thread {
 static coro_mutex_t queue_event_mutex;
 static coro_cond_t queue_event;
 
+static struct list_head work_queue;
+static coro_mutex_t work_queue_mutex;
+static coro_cond_t work_queue_event;
+
 static int running = FALSE;
 
 static int inited = FALSE;
@@ -46,6 +52,8 @@ static struct worker_thread threads[MAX_THREADS];
 static struct worker_thread* self = NULL;
 
 static const struct asyncdriver* async_drv = NULL;
+
+static void async_work_thread(void);
 
 static void enqueue(const MESSAGE* msg)
 {
@@ -112,6 +120,16 @@ static void init_main_thread(const struct asyncdriver* asd, size_t num_workers)
         panic("%s: failed to initialize condition variable", async_drv->name);
     }
 
+    INIT_LIST_HEAD(&work_queue);
+
+    if (coro_mutex_init(&work_queue_mutex, NULL) != 0) {
+        panic("%s: failed to initialize mutex", async_drv->name);
+    }
+
+    if (coro_cond_init(&work_queue_event, NULL) != 0) {
+        panic("%s: failed to initialize condition variable", async_drv->name);
+    }
+
     if (coro_mutex_init(&init_event_mutex, NULL) != 0) {
         panic("%s: failed to initialize init event mutex", async_drv->name);
     }
@@ -153,38 +171,42 @@ static void* worker_main(void* arg)
         if (coro_mutex_unlock(&init_event_mutex) != 0) {
             panic("%s: failed to unlock init event mutex", async_drv->name);
         }
-    }
-
-    if (coro_mutex_lock(&init_event_mutex) != 0) {
-        panic("%s: failed to lock init event mutex", async_drv->name);
-    }
-    while (!inited) {
-        if (coro_cond_wait(&init_event, &init_event_mutex) != 0) {
-            panic("%s: failed to wait for init event", async_drv->name);
+    } else {
+        if (coro_mutex_lock(&init_event_mutex) != 0) {
+            panic("%s: failed to lock init event mutex", async_drv->name);
         }
-    }
-    if (coro_mutex_unlock(&init_event_mutex) != 0) {
-        panic("%s: failed to unlock init event mutex", async_drv->name);
-    }
-
-    while (running) {
-        if (!mq_dequeue(&msg)) {
-            if (!dequeue(self, &msg)) {
-                break;
+        while (!inited) {
+            if (coro_cond_wait(&init_event, &init_event_mutex) != 0) {
+                panic("%s: failed to wait for init event", async_drv->name);
             }
         }
+        if (coro_mutex_unlock(&init_event_mutex) != 0) {
+            panic("%s: failed to unlock init event mutex", async_drv->name);
+        }
+    }
 
-        self->state = WS_BUSY;
+    if (self->id == ASYNC_WORK_THREAD) {
+        async_work_thread();
+    } else {
+        while (running) {
+            if (!mq_dequeue(&msg)) {
+                if (!dequeue(self, &msg)) {
+                    break;
+                }
+            }
 
-        async_drv->process(&msg);
+            self->state = WS_BUSY;
 
-        self->state = WS_RUNNING;
+            async_drv->process(&msg);
+
+            self->state = WS_RUNNING;
+        }
     }
 
     return NULL;
 }
 
-static void create_worker(struct worker_thread* wp, worker_id_t wid,
+static void create_worker(struct worker_thread* wp, async_worker_id_t wid,
                           void (*init_func)(void))
 {
     coro_attr_t attr;
@@ -236,6 +258,89 @@ static void dispatch_message(MESSAGE* msg)
     }
 
     enqueue(msg);
+}
+
+int asyncdrv_enqueue_work(struct async_work* work)
+{
+    if (work->flags & ASYNC_WORK_PENDING) return FALSE;
+
+    work->flags |= ASYNC_WORK_PENDING;
+
+    if (coro_mutex_lock(&work_queue_mutex) != 0) {
+        panic("%s: failed to lock work queue mutex", async_drv->name);
+    }
+
+    list_add_tail(&work->entry, &work_queue);
+
+    if (coro_cond_signal(&work_queue_event) != 0) {
+        panic("%s: failed to signal work queue event", async_drv->name);
+    }
+
+    if (coro_mutex_unlock(&work_queue_mutex) != 0) {
+        panic("%s: failed to lock work queue mutex", async_drv->name);
+    }
+
+    return TRUE;
+}
+
+static struct async_work* dequeue_work(void)
+{
+    struct async_work* work;
+
+    if (list_empty(&work_queue)) return NULL;
+
+    work = list_entry(work_queue.next, struct async_work, entry);
+    list_del(&work->entry);
+
+    return work;
+}
+
+static struct async_work* wait_for_work(void)
+{
+    struct worker_thread* thread;
+    struct async_work* work = NULL;
+
+    do {
+        thread = self;
+
+        if (coro_mutex_lock(&work_queue_mutex) != 0) {
+            panic("%s: failed to lock work queue mutex", async_drv->name);
+        }
+
+        if (coro_cond_wait(&work_queue_event, &work_queue_mutex) != 0) {
+            panic("%s: failed to wait for work queue event", async_drv->name);
+        }
+
+        if (coro_mutex_unlock(&work_queue_mutex) != 0) {
+            panic("%s: failed to unlock work queue mutex", async_drv->name);
+        }
+
+        self = thread;
+
+        if (!running) {
+            return NULL;
+        }
+    } while ((work = dequeue_work()) == NULL);
+
+    return work;
+}
+
+static void async_work_thread(void)
+{
+    struct async_work* work;
+
+    self->state = WS_BUSY;
+
+    while (running) {
+        if ((work = dequeue_work()) == NULL) {
+            if ((work = wait_for_work()) == NULL) {
+                break;
+            }
+        }
+
+        work->flags &= ~ASYNC_WORK_PENDING;
+        (*work->func)(work);
+    }
 }
 
 static void yield_all(void)
@@ -308,6 +413,7 @@ void asyncdrv_task(const struct asyncdriver* asd, size_t num_workers,
                    void (*init_func)(void))
 {
     MESSAGE msg;
+    struct worker_thread* wp;
 
     if (!init_func) inited = TRUE;
 
@@ -316,11 +422,9 @@ void asyncdrv_task(const struct asyncdriver* asd, size_t num_workers,
         running = TRUE;
     }
 
-    if (init_func) {
-        struct worker_thread* wp = &threads[0];
-        create_worker(wp, 0, init_func);
-        yield_all();
-    }
+    wp = &threads[ASYNC_WORK_THREAD];
+    create_worker(wp, ASYNC_WORK_THREAD, init_func);
+    if (init_func) yield_all();
 
     while (running) {
         send_recv(RECEIVE_ASYNC, ANY, &msg);

@@ -4,6 +4,8 @@
 #include <lyos/types.h>
 #include <lyos/ipc.h>
 
+#include "work.h"
+
 typedef unsigned int async_worker_id_t;
 
 struct asyncdriver {
