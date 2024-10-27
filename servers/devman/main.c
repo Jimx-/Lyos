@@ -35,6 +35,8 @@
 
 #include "proto.h"
 
+#define MAX_THREADS 8
+
 static void devman_init();
 static int devfs_mknod(struct memfs_inode* inode, const char* name,
                        struct memfs_stat* stat, cbdata_t cbdata);
@@ -66,7 +68,7 @@ int main(int argc, char* argv[])
     root_stat.st_uid = SU_UID;
     root_stat.st_gid = 0;
 
-    return memfs_start(NULL, &fs_hooks, &root_stat);
+    return memfs_start(NULL, &fs_hooks, &root_stat, MAX_THREADS);
 }
 
 static void init_sysfs()
@@ -96,14 +98,6 @@ static void devman_init()
     map_driver(MAKE_DEV(DEV_RD, MINOR_INITRD), DT_BLOCKDEV, TASK_RD);
 }
 
-static void do_device_attr_reply(MESSAGE* msg)
-{
-    int status = msg->u.m_devman_attr_reply.status;
-    size_t count = msg->u.m_devman_attr_reply.count;
-
-    sysfs_complete_dyn_attr(status, count);
-}
-
 static void devfs_message_hook(MESSAGE* msg)
 {
     int reply = TRUE;
@@ -130,10 +124,6 @@ static void devfs_message_hook(MESSAGE* msg)
         break;
     case DM_DEVICE_ATTR_ADD:
         msg->RETVAL = do_device_attr_add(msg);
-        break;
-    case DM_DEVICE_ATTR_REPLY:
-        do_device_attr_reply(msg);
-        reply = FALSE;
         break;
     case SYSFS_DYN_SHOW:
     case SYSFS_DYN_STORE:

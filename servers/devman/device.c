@@ -351,8 +351,6 @@ device_id_t do_device_register(MESSAGE* m)
     retval = publish_device(dev);
     if (retval) return retval;
 
-    device_uevent(dev, KOBJ_ADD);
-
     m->u.m_devman_register_reply.id = dev->id;
     return 0;
 }
@@ -410,10 +408,10 @@ static ssize_t device_attr_show(sysfs_dyn_attr_t* sf_attr, char* buf,
     retval = send_recv(BOTH, attr->owner, &msg);
     if (retval) return -retval;
 
-    sysfs_complete_dyn_attr(msg.u.m_devman_attr_reply.status,
-                            msg.u.m_devman_attr_reply.count);
+    if (msg.u.m_devman_attr_reply.status > 0)
+        return -msg.u.m_devman_attr_reply.status;
 
-    return SUSPEND;
+    return msg.u.m_devman_attr_reply.count;
 }
 
 static ssize_t device_attr_store(sysfs_dyn_attr_t* sf_attr, const char* buf,
@@ -433,10 +431,10 @@ static ssize_t device_attr_store(sysfs_dyn_attr_t* sf_attr, const char* buf,
     retval = send_recv(BOTH, attr->owner, &msg);
     if (retval) return -retval;
 
-    sysfs_complete_dyn_attr(msg.u.m_devman_attr_reply.status,
-                            msg.u.m_devman_attr_reply.count);
+    if (msg.u.m_devman_attr_reply.status > 0)
+        return -msg.u.m_devman_attr_reply.status;
 
-    return SUSPEND;
+    return msg.u.m_devman_attr_reply.count;
 }
 
 static int get_device_path_length(struct device* dev)

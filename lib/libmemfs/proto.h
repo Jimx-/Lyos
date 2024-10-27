@@ -29,7 +29,4 @@ struct memfs_inode* memfs_new_inode(ino_t num, const char* name, int index);
 struct memfs_inode* memfs_find_inode(ino_t num);
 void memfs_addhash_inode(struct memfs_inode* inode);
 
-int memfs_init_buf(void);
-int memfs_free_buf(void);
-
 #endif

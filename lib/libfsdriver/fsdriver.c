@@ -21,99 +21,104 @@
 
 #include "proto.h"
 
+void fsdriver_process(const struct fsdriver* fsd, MESSAGE* msg)
+{
+    int txn_id = VFS_TXN_GET_ID(msg->type);
+    int msgtype = VFS_TXN_GET_TYPE(msg->type);
+    int src = msg->source;
+    int reply = TRUE;
+
+    switch (msgtype) {
+    case FS_LOOKUP:
+        msg->u.m_fs_vfs_lookup_reply.status = fsdriver_lookup(fsd, msg);
+        break;
+    case FS_PUTINODE:
+        msg->RETVAL = fsdriver_putinode(fsd, msg);
+        break;
+    case FS_MOUNTPOINT:
+        msg->RET_RETVAL = fsdriver_mountpoint(fsd, msg);
+        break;
+    case FS_READSUPER:
+        msg->u.m_fs_vfs_create_reply.status = fsdriver_readsuper(fsd, msg);
+        break;
+    case FS_STAT:
+        msg->RETVAL = fsdriver_stat(fsd, msg);
+        break;
+    case FS_RDWT:
+        msg->u.m_vfs_fs_readwrite.status = fsdriver_readwrite(fsd, msg);
+        break;
+    case FS_CREATE:
+        msg->u.m_fs_vfs_create_reply.status = fsdriver_create(fsd, msg);
+        break;
+    case FS_MKDIR:
+        msg->u.m_fs_vfs_create_reply.status = fsdriver_mkdir(fsd, msg);
+        break;
+    case FS_MKNOD:
+        msg->RETVAL = fsdriver_mknod(fsd, msg);
+        break;
+    case FS_FTRUNC:
+        msg->RET_RETVAL = fsdriver_ftrunc(fsd, msg);
+        break;
+    case FS_CHMOD:
+        msg->RET_RETVAL = fsdriver_chmod(fsd, msg);
+        break;
+    case FS_CHOWN:
+        msg->u.m_vfs_fs_chown.status = fsdriver_chown(fsd, msg);
+        break;
+    case FS_GETDENTS:
+        msg->u.m_vfs_fs_readwrite.status = fsdriver_getdents(fsd, msg);
+        break;
+    case FS_SYNC:
+        msg->RET_RETVAL = fsdriver_sync(fsd, msg);
+        break;
+    case FS_RDLINK:
+        msg->u.m_vfs_fs_readwrite.status = fsdriver_rdlink(fsd, msg);
+        break;
+    case FS_LINK:
+        msg->RETVAL = fsdriver_link(fsd, msg);
+        break;
+    case FS_SYMLINK:
+        msg->RETVAL = fsdriver_symlink(fsd, msg);
+        break;
+    case FS_UNLINK:
+        msg->RETVAL = fsdriver_unlink(fsd, msg);
+        break;
+    case FS_RMDIR:
+        msg->RETVAL = fsdriver_rmdir(fsd, msg);
+        break;
+    case FS_UTIME:
+        msg->RETVAL = fsdriver_utime(fsd, msg);
+        break;
+    default:
+        if (fsd->fs_other) {
+            fsd->fs_other(msg);
+            reply = 0;
+        } else
+            msg->RET_RETVAL = ENOSYS;
+        break;
+    }
+
+    /* reply */
+    if (reply) {
+        msg->type = VFS_TXN_TYPE_ID(FSREQ_RET, txn_id);
+        send_recv(SEND, src, msg);
+    }
+
+    /* if (fsd->fs_sync) fsd->fs_sync(); */
+}
+
 int fsdriver_start(const struct fsdriver* fsd)
 {
-    int retval = fsdriver_register(fsd);
+    MESSAGE m;
+    int retval;
+
+    retval = fsdriver_register(fsd);
     if (retval != 0) return retval;
 
-    int reply;
-
-    MESSAGE m;
     while (TRUE) {
         send_recv(RECEIVE_ASYNC, ANY, &m);
 
-        int txn_id = VFS_TXN_GET_ID(m.type);
-        int msgtype = VFS_TXN_GET_TYPE(m.type);
-        int src = m.source;
-        reply = 1;
-
-        switch (msgtype) {
-        case FS_LOOKUP:
-            m.u.m_fs_vfs_lookup_reply.status = fsdriver_lookup(fsd, &m);
-            break;
-        case FS_PUTINODE:
-            m.RETVAL = fsdriver_putinode(fsd, &m);
-            break;
-        case FS_MOUNTPOINT:
-            m.RET_RETVAL = fsdriver_mountpoint(fsd, &m);
-            break;
-        case FS_READSUPER:
-            m.u.m_fs_vfs_create_reply.status = fsdriver_readsuper(fsd, &m);
-            break;
-        case FS_STAT:
-            m.RETVAL = fsdriver_stat(fsd, &m);
-            break;
-        case FS_RDWT:
-            m.u.m_vfs_fs_readwrite.status = fsdriver_readwrite(fsd, &m);
-            break;
-        case FS_CREATE:
-            m.u.m_fs_vfs_create_reply.status = fsdriver_create(fsd, &m);
-            break;
-        case FS_MKDIR:
-            m.u.m_fs_vfs_create_reply.status = fsdriver_mkdir(fsd, &m);
-            break;
-        case FS_MKNOD:
-            m.RETVAL = fsdriver_mknod(fsd, &m);
-            break;
-        case FS_FTRUNC:
-            m.RET_RETVAL = fsdriver_ftrunc(fsd, &m);
-            break;
-        case FS_CHMOD:
-            m.RET_RETVAL = fsdriver_chmod(fsd, &m);
-            break;
-        case FS_CHOWN:
-            m.u.m_vfs_fs_chown.status = fsdriver_chown(fsd, &m);
-            break;
-        case FS_GETDENTS:
-            m.u.m_vfs_fs_readwrite.status = fsdriver_getdents(fsd, &m);
-            break;
-        case FS_SYNC:
-            m.RET_RETVAL = fsdriver_sync(fsd, &m);
-            break;
-        case FS_RDLINK:
-            m.u.m_vfs_fs_readwrite.status = fsdriver_rdlink(fsd, &m);
-            break;
-        case FS_LINK:
-            m.RETVAL = fsdriver_link(fsd, &m);
-            break;
-        case FS_SYMLINK:
-            m.RETVAL = fsdriver_symlink(fsd, &m);
-            break;
-        case FS_UNLINK:
-            m.RETVAL = fsdriver_unlink(fsd, &m);
-            break;
-        case FS_RMDIR:
-            m.RETVAL = fsdriver_rmdir(fsd, &m);
-            break;
-        case FS_UTIME:
-            m.RETVAL = fsdriver_utime(fsd, &m);
-            break;
-        default:
-            if (fsd->fs_other) {
-                fsd->fs_other(&m);
-                reply = 0;
-            } else
-                m.RET_RETVAL = ENOSYS;
-            break;
-        }
-
-        /* reply */
-        if (reply) {
-            m.type = VFS_TXN_TYPE_ID(FSREQ_RET, txn_id);
-            send_recv(SEND, src, &m);
-        }
-
-        /* if (fsd->fs_sync) fsd->fs_sync(); */
+        fsdriver_process(fsd, &m);
     }
 
     return 0;

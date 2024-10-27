@@ -1,7 +1,6 @@
+SRCS	= main.c global.c node.c utils.c buffer.c file.c
+LIBS	= memfs fsdriver asyncdriver bdev devman coro lyos
 
-SRCS 	= main.c global.c node.c utils.c buffer.c file.c
-LIBS	= memfs fsdriver bdev devman lyos
-
-PROG 	= sysfs
+PROG	= sysfs
 
 include lyos.service.mk

@@ -26,8 +26,10 @@
 #include "global.h"
 #include "proto.h"
 
+#define MAX_THREADS 8
+
 static int init_procfs();
-static int procfs_init_hook();
+static void procfs_init_hook();
 
 struct memfs_hooks fs_hooks = {
     .init_hook = procfs_init_hook,
@@ -48,7 +50,7 @@ int main()
     root_stat.st_uid = SU_UID;
     root_stat.st_gid = 0;
 
-    return memfs_start("proc", &fs_hooks, &root_stat);
+    return memfs_start("proc", &fs_hooks, &root_stat, MAX_THREADS);
 }
 
 static int init_procfs()
@@ -76,7 +78,7 @@ static void build_root(struct memfs_inode* root)
     }
 }
 
-static int procfs_init_hook()
+static void procfs_init_hook()
 {
     static int first = 1;
 
@@ -87,6 +89,4 @@ static int procfs_init_hook()
 
         first = 0;
     }
-
-    return 0;
 }

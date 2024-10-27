@@ -24,7 +24,7 @@
 #define NO_INDEX -1
 
 struct memfs_hooks {
-    int (*init_hook)();
+    void (*init_hook)(void);
     ssize_t (*read_hook)(struct memfs_inode* inode, char* ptr, size_t count,
                          off_t offset, cbdata_t data);
     ssize_t (*write_hook)(struct memfs_inode* inode, char* ptr, size_t count,
@@ -49,7 +49,7 @@ struct memfs_hooks {
 extern struct memfs_hooks fs_hooks;
 
 int memfs_start(char* name, struct memfs_hooks* hooks,
-                struct memfs_stat* root_stat);
+                struct memfs_stat* root_stat, size_t num_workers);
 
 int memfs_node_index(struct memfs_inode* pin);
 struct memfs_inode* memfs_node_parent(struct memfs_inode* pin);

@@ -16,6 +16,8 @@
 #ifndef _SYSFS_PROTO_H_
 #define _SYSFS_PROTO_H_
 
+#include "type.h"
+
 void init_node();
 sysfs_node_t* new_node(const char* name, int flags);
 int add_node(sysfs_node_t* parent, sysfs_node_t* child);
@@ -26,9 +28,9 @@ int traverse_node(sysfs_node_t* root, int type_mask,
                   int (*callback)(const char*, sysfs_node_t*, void*),
                   void* cb_data);
 
-void init_buf(char* ptr, size_t len, off_t off);
-void buf_printf(char* fmt, ...);
-size_t buf_used();
+void init_buf(struct sysfs_buf* buf, char* ptr, size_t len, off_t off);
+void buf_printf(struct sysfs_buf* buf, char* fmt, ...);
+size_t buf_used(struct sysfs_buf* buf);
 
 ssize_t sysfs_read_hook(struct memfs_inode* inode, char* ptr, size_t count,
                         off_t offset, cbdata_t data);
@@ -42,5 +44,7 @@ int do_publish_link(MESSAGE* m);
 int do_retrieve(MESSAGE* m);
 int do_subscribe(MESSAGE* m);
 int do_get_event(MESSAGE* m);
+
+void do_dyn_attr_reply(const MESSAGE* msg);
 
 #endif

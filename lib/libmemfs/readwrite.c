@@ -25,32 +25,18 @@
 
 #define BUFSIZE 1024
 
-char* memfs_buf;
-size_t memfs_bufsize;
-
-int memfs_init_buf(void)
-{
-    memfs_buf = (char*)malloc(BUFSIZE);
-    if (memfs_buf == NULL) return ENOMEM;
-
-    memfs_bufsize = BUFSIZE;
-    return 0;
-}
-
-int memfs_free_buf(void)
-{
-    free(memfs_buf);
-    memfs_buf = NULL;
-    memfs_bufsize = 0;
-
-    return 0;
-}
-
 static ssize_t memfs_readwrite(dev_t dev, ino_t num, int rw_flag,
                                struct fsdriver_data* data, loff_t rwpos,
                                size_t count)
 {
     struct memfs_inode* pin = memfs_find_inode(num);
+    off_t off;
+    size_t chunk;
+    ssize_t len;
+    char* buf;
+    size_t buf_size;
+    int retval = 0;
+
     if (!pin) return -ENOENT;
 
     if (!S_ISREG(pin->i_stat.st_mode)) return -EINVAL;
@@ -62,44 +48,43 @@ static ssize_t memfs_readwrite(dev_t dev, ino_t num, int rw_flag,
         return 0;
     }
 
-    off_t off;
-    size_t chunk;
-    ssize_t len;
-    int retval = 0;
+    buf = malloc(BUFSIZE);
+    if (!buf) return -ENOMEM;
+    buf_size = BUFSIZE;
 
     for (off = 0; off < count;) {
         chunk = count - off;
-        if (chunk > memfs_bufsize) chunk = memfs_bufsize;
+        if (chunk > buf_size) chunk = buf_size;
 
         if (rw_flag == WRITE) {
-            retval = fsdriver_copyin(data, off, memfs_buf, chunk);
+            retval = fsdriver_copyin(data, off, buf, chunk);
         }
 
         if (rw_flag == READ) {
-            len = fs_hooks.read_hook(pin, memfs_buf, chunk, rwpos, pin->data);
+            len = fs_hooks.read_hook(pin, buf, chunk, rwpos, pin->data);
         } else {
-            len = fs_hooks.write_hook(pin, memfs_buf, chunk, rwpos, pin->data);
+            len = fs_hooks.write_hook(pin, buf, chunk, rwpos, pin->data);
         }
 
         if (len > 0) {
-            if (rw_flag == READ)
-                retval = fsdriver_copyout(data, off, memfs_buf, len);
+            if (rw_flag == READ) retval = fsdriver_copyout(data, off, buf, len);
         } else {
             retval = -len;
         }
 
         if (retval) {
-            if (off > 0) {
-                return off;
-            } else
-                return -retval;
+            off = off > 0 ? off : -retval;
+            goto free_buf;
         }
 
         off += len;
         rwpos += len;
 
-        if (len < memfs_bufsize) break;
+        if (len < buf_size) break;
     }
+
+free_buf:
+    free(buf);
 
     return off;
 }

@@ -48,7 +48,7 @@ static struct fsdriver fsd = {
 };
 
 int memfs_start(char* name, struct memfs_hooks* hooks,
-                struct memfs_stat* root_stat)
+                struct memfs_stat* root_stat, size_t num_workers)
 {
     struct memfs_inode* root = memfs_get_root_inode();
 
@@ -56,8 +56,6 @@ int memfs_start(char* name, struct memfs_hooks* hooks,
 
     if (!hooks) return EINVAL;
     memcpy(&fs_hooks, hooks, sizeof(fs_hooks));
-
-    if (memfs_init_buf()) return ENOMEM;
 
     memfs_init_inode();
 
@@ -70,9 +68,7 @@ int memfs_start(char* name, struct memfs_hooks* hooks,
     memfs_set_inode_stat(root, root_stat);
     memfs_addhash_inode(root);
 
-    if (fs_hooks.init_hook) fs_hooks.init_hook();
-
-    return fsdriver_start(&fsd);
+    return fsdriver_async_start(&fsd, num_workers, fs_hooks.init_hook);
 }
 
 static void memfs_other(MESSAGE* m)

@@ -90,8 +90,9 @@ struct fsdriver {
     int (*fs_sync)();
 
     void (*fs_other)(MESSAGE* m);
-} __attribute__((packed));
+};
 
+void fsdriver_process(const struct fsdriver* fsd, MESSAGE* msg);
 int fsdriver_start(const struct fsdriver* fsd);
 
 int fsdriver_copyin(struct fsdriver_data* data, size_t offset, void* buf,
@@ -115,5 +116,8 @@ int fsdriver_parse_param(struct fsdriver_context* fc, const char* key,
                                           size_t len));
 
 int fsdriver_driver(dev_t dev);
+
+int fsdriver_async_start(const struct fsdriver* fsd, size_t num_workers,
+                         void (*init_func)(void));
 
 #endif

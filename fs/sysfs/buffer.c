@@ -20,31 +20,29 @@
 #include "lyos/const.h"
 #include "string.h"
 
-static char* buf;
-static size_t used, left;
-static off_t offset;
+#include "type.h"
 
 #define BUF_SIZE 4096
 
-void init_buf(char* ptr, size_t len, off_t off)
+void init_buf(struct sysfs_buf* buf, char* ptr, size_t len, off_t off)
 {
-    buf = ptr;
-    offset = off;
-    left = min(len, BUF_SIZE);
-    used = 0;
+    buf->buf = ptr;
+    buf->offset = off;
+    buf->left = min(len, BUF_SIZE);
+    buf->used = 0;
 }
 
-void buf_printf(char* fmt, ...)
+void buf_printf(struct sysfs_buf* buf, char* fmt, ...)
 {
     va_list args;
     ssize_t len, max;
 
-    if (left == 0) return;
+    if (buf->left == 0) return;
 
-    max = min(offset + left + 1, BUF_SIZE);
+    max = min(buf->offset + buf->left + 1, BUF_SIZE);
 
     va_start(args, fmt);
-    len = vsnprintf(&buf[used], max, fmt, args);
+    len = vsnprintf(&buf->buf[buf->used], max, fmt, args);
     va_end(args);
 
     /*
@@ -53,24 +51,24 @@ void buf_printf(char* fmt, ...)
      */
     if (len >= BUF_SIZE) len = BUF_SIZE - 1;
 
-    if (offset > 0) {
+    if (buf->offset > 0) {
 
-        if (offset >= len) {
-            offset -= len;
+        if (buf->offset >= len) {
+            buf->offset -= len;
 
             return;
         }
 
-        memmove(buf, &buf[offset], len - offset);
+        memmove(buf, &buf[buf->offset], len - buf->offset);
 
-        len -= offset;
-        offset = 0;
+        len -= buf->offset;
+        buf->offset = 0;
     }
 
-    if (len > (ssize_t)left) len = left;
+    if (len > (ssize_t)buf->left) len = buf->left;
 
-    used += len;
-    left -= len;
+    buf->used += len;
+    buf->left -= len;
 }
 
-size_t buf_used() { return used; }
+size_t buf_used(struct sysfs_buf* buf) { return buf->used; }

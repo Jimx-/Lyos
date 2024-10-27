@@ -15,36 +15,51 @@
 
 #include <lyos/types.h>
 #include <lyos/ipc.h>
-#include "errno.h"
-#include "lyos/const.h"
-#include "string.h"
+#include <errno.h>
+#include <lyos/const.h>
+#include <string.h>
 #include <sys/stat.h>
-#include "libmemfs/libmemfs.h"
+#include <stdlib.h>
+
+#include <libasyncdriver/libasyncdriver.h>
+#include <libmemfs/libmemfs.h>
 #include <libsysfs/libsysfs.h>
+
 #include "node.h"
 #include "proto.h"
 
 #define BUFSIZE 4096
 
-static ssize_t dyn_attr_show(sysfs_node_t* node)
+static ssize_t dyn_attr_show(sysfs_node_t* node, struct sysfs_buf* buf)
 {
-    static char buf[BUFSIZE];
-
     MESSAGE msg;
+    char* page;
+    ssize_t count;
+
+    page = malloc(BUFSIZE);
+    if (!page) return -ENOMEM;
+
     msg.type = SYSFS_DYN_SHOW;
-    msg.BUF = buf;
+    msg.BUF = page;
     msg.CNT = BUFSIZE;
     msg.TARGET = node->u.dyn_attr->id;
+    msg.u.m3.m3l1 = asyncdrv_worker_id();
 
-    /* TODO: async read/write */
-    send_recv(BOTH, node->u.dyn_attr->owner, &msg);
+    asyncdrv_sendrec(node->u.dyn_attr->owner, &msg);
 
-    ssize_t count = msg.CNT;
-    if (count < 0) return count;
+    count = msg.CNT;
+    if (count < 0) goto free_page;
 
-    if (count >= BUFSIZE) return E2BIG;
-    buf[count] = '\0';
-    buf_printf("%s", buf);
+    if (count >= BUFSIZE) {
+        count = -E2BIG;
+        goto free_page;
+    }
+
+    page[count] = '\0';
+    buf_printf(buf, "%s", page);
+
+free_page:
+    free(page);
 
     return count;
 }
@@ -52,36 +67,45 @@ static ssize_t dyn_attr_show(sysfs_node_t* node)
 static ssize_t dyn_attr_store(sysfs_node_t* node, const char* ptr, size_t count)
 {
     MESSAGE msg;
+
     msg.type = SYSFS_DYN_STORE;
     msg.BUF = (char*)ptr;
     msg.CNT = count;
     msg.TARGET = node->u.dyn_attr->id;
+    msg.u.m3.m3l1 = asyncdrv_worker_id();
 
-    /* TODO: async read/write */
-    send_recv(BOTH, node->u.dyn_attr->owner, &msg);
+    asyncdrv_sendrec(node->u.dyn_attr->owner, &msg);
 
     return msg.CNT;
+}
+
+void do_dyn_attr_reply(const MESSAGE* msg)
+{
+    async_worker_id_t tid = msg->u.m3.m3l1;
+    asyncdrv_reply(tid, msg);
 }
 
 ssize_t sysfs_read_hook(struct memfs_inode* inode, char* ptr, size_t count,
                         off_t offset, cbdata_t data)
 {
-    init_buf(ptr, count, offset);
+    struct sysfs_buf buf;
+
+    init_buf(&buf, ptr, count, offset);
 
     sysfs_node_t* node = (sysfs_node_t*)data;
     int retval = 0;
 
     switch (NODE_TYPE(node)) {
     case SF_TYPE_U32:
-        buf_printf("%d\n", node->u.u32v);
+        buf_printf(&buf, "%d\n", node->u.u32v);
         break;
     case SF_TYPE_DYNAMIC:
-        retval = dyn_attr_show(node);
+        retval = dyn_attr_show(node, &buf);
         break;
     }
     if (retval < 0) return retval;
 
-    return buf_used();
+    return buf_used(&buf);
 }
 
 ssize_t sysfs_write_hook(struct memfs_inode* inode, char* ptr, size_t count,

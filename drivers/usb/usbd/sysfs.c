@@ -259,8 +259,21 @@ usb_intf_attr(bInterfaceClass, "%02x\n");
 usb_intf_attr(bInterfaceSubClass, "%02x\n");
 usb_intf_attr(bInterfaceProtocol, "%02x\n");
 
+static ssize_t interface_show(struct device_attribute* attr, char* buf,
+                              size_t size)
+{
+    struct usb_interface* intf = attr->cb_data;
+    char* string;
+
+    string = intf->cur_altsetting->string;
+    if (!string) return 0;
+    return snprintf(buf, size, "%s\n", string);
+}
+
 int usb_create_sysfs_intf_files(struct usb_interface* intf)
 {
+    struct usb_device* udev = intf->parent;
+    struct usb_host_interface* alt = intf->cur_altsetting;
     struct device_attribute attr;
 
     dm_init_device_attr(&attr, intf->dev_id, "bInterfaceNumber",
@@ -286,6 +299,15 @@ int usb_create_sysfs_intf_files(struct usb_interface* intf)
     dm_init_device_attr(&attr, intf->dev_id, "bInterfaceProtocol",
                         SF_PRIV_OVERWRITE, intf, bInterfaceProtocol_show, NULL);
     dm_async_device_attr_add(&attr);
+
+    if (!alt->string)
+        alt->string = usb_cache_string(udev, alt->desc.iInterface);
+
+    if (alt->string) {
+        dm_init_device_attr(&attr, intf->dev_id, "interface", SF_PRIV_OVERWRITE,
+                            intf, interface_show, NULL);
+        dm_async_device_attr_add(&attr);
+    }
 
     return 0;
 }

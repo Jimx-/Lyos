@@ -30,14 +30,6 @@
 /* dynamic attribute hash table */
 static struct list_head dyn_attr_table[DYN_ATTR_HASH_SIZE];
 
-static struct {
-    int type;
-    endpoint_t source;
-    void* src_buf;
-    void* buf;
-    size_t size;
-} wait_context;
-
 int sysfs_init_dyn_attr(sysfs_dyn_attr_t* attr, char* label, int flags,
                         void* cb_data, sysfs_dyn_attr_show_t show,
                         sysfs_dyn_attr_store_t store)
@@ -133,16 +125,6 @@ int sysfs_publish_dyn_attr(sysfs_dyn_attr_t* attr)
     return 0;
 }
 
-static void setup_wait_context(int type, endpoint_t source, void* src_buf,
-                               void* buf, size_t size)
-{
-    wait_context.type = type;
-    wait_context.source = source;
-    wait_context.src_buf = src_buf;
-    wait_context.buf = buf;
-    wait_context.size = size;
-}
-
 #define BUFSIZE 4096
 void sysfs_handle_dyn_attr(MESSAGE* msg)
 {
@@ -160,7 +142,6 @@ void sysfs_handle_dyn_attr(MESSAGE* msg)
     }
 
     memset(tmp_buf, 0, sizeof(tmp_buf));
-    setup_wait_context(rw_flag, msg->source, buf, tmp_buf, count);
 
     if (rw_flag == SYSFS_DYN_SHOW) {
         if (!attr->show) {
@@ -197,30 +178,6 @@ reply:
 
     msg->CNT = retval;
 
-    msg->type = SYSCALL_RET;
-    send_recv(SEND_NONBLOCK, msg->source, msg);
-}
-
-void sysfs_complete_dyn_attr(int status, size_t count)
-{
-    ssize_t retval;
-    MESSAGE msg;
-
-    retval = status ? -status : count;
-
-    if (wait_context.type == SYSFS_DYN_SHOW && status == 0) {
-        if (count >= wait_context.size) {
-            retval = -E2BIG;
-            goto reply;
-        }
-
-        data_copy(wait_context.source, wait_context.src_buf, SELF,
-                  wait_context.buf, count);
-    }
-
-reply:
-    msg.CNT = retval;
-    msg.type = SYSCALL_RET;
-
-    send_recv(SEND_NONBLOCK, wait_context.source, &msg);
+    msg->type = SYSFS_DYN_REPLY;
+    send_recv(SEND, msg->source, msg);
 }

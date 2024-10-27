@@ -23,6 +23,8 @@
 #include "node.h"
 #include "proto.h"
 
+#define MAX_THREADS 16
+
 static int sysfs_init();
 static void sysfs_message_hook(MESSAGE* m);
 
@@ -43,7 +45,7 @@ int main()
     root_stat.st_uid = SU_UID;
     root_stat.st_gid = 0;
 
-    return memfs_start(NULL, &fs_hooks, &root_stat);
+    return memfs_start(NULL, &fs_hooks, &root_stat, MAX_THREADS);
 }
 
 static int sysfs_init()
@@ -74,6 +76,10 @@ static void sysfs_message_hook(MESSAGE* m)
         break;
     case SYSFS_GET_EVENT:
         m->u.m_sysfs_req.status = do_get_event(m);
+        break;
+    case SYSFS_DYN_REPLY:
+        do_dyn_attr_reply(m);
+        m->RETVAL = SUSPEND;
         break;
     default:
         m->RETVAL = ENOSYS;
