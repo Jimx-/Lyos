@@ -1,3 +1,4 @@
+#define __LINUX_ERRNO_EXTENSIONS__
 #include <lyos/const.h>
 #include <stdlib.h>
 #include <lyos/sysutils.h>
@@ -21,34 +22,6 @@ static const char* name = "usb-hub";
 #define HUB_BH_RESET_TIME    50
 #define HUB_LONG_RESET_TIME  200
 #define HUB_RESET_TIMEOUT    800
-
-static int hub_configure(struct usb_hub* hub);
-static void hub_irq(struct urb* urb);
-
-static void hub_event(struct async_work* work);
-
-struct usb_hub* usb_create_hub(struct usb_device* hdev)
-{
-    struct usb_hub* hub;
-    int retval;
-
-    hub = malloc(sizeof(*hub));
-    if (!hub) return NULL;
-
-    hub->hdev = hdev;
-    usb_get_dev(hdev);
-    INIT_ASYNC_WORK(&hub->events, hub_event);
-
-    hub->maxchild = USB_MAXCHILDREN;
-
-    return hub;
-
-put_dev:
-    usb_put_dev(hdev);
-
-    free(hub);
-    return NULL;
-}
 
 static void assign_devnum(struct usb_device* udev)
 {
@@ -498,21 +471,35 @@ static void hub_event(struct async_work* work)
     }
 }
 
-void usb_hub_handle_status_data(struct usb_hub* hub, const char* buffer,
-                                int length)
+static void hub_irq(struct urb* urb)
 {
+    struct usb_hub* hub = urb->context;
+    int status = urb->status;
     unsigned long bits;
     int i;
 
-    bits = 0;
-    for (i = 0; i < length; ++i)
-        bits |= ((unsigned long)(buffer[i])) << (i * 8);
-    hub->event_bits[0] = bits;
+    switch (status) {
+    case ENOENT:
+    case ECONNRESET:
+    case ESHUTDOWN:
+        return;
+
+    default:
+        hub->nerrors++;
+        hub->error = status;
+
+    case 0:
+        bits = 0;
+        for (i = 0; i < urb->actual_length; ++i)
+            bits |= ((unsigned long)(hub->buffer[i])) << (i * 8);
+        hub->event_bits[0] = bits;
+        break;
+    }
 
     asyncdrv_enqueue_work(&hub->events);
-}
 
-static void hub_irq(struct urb* urb) {}
+    usb_submit_urb(hub->urb);
+}
 
 static void announce_device(struct usb_device* udev)
 {
@@ -564,6 +551,75 @@ int usb_new_device(struct usb_device* udev)
 
     cfg = usb_choose_configuration(udev);
     if (cfg >= 0) usb_set_configuration(udev, cfg);
+
+    return 0;
+}
+static int hub_configure(struct usb_hub* hub,
+                         struct usb_endpoint_descriptor* endpoint)
+{
+    struct usb_device* hdev = hub->hdev;
+    unsigned int pipe;
+    int maxp;
+
+    hub->maxchild = USB_MAXCHILDREN;
+
+    hub->urb = usb_alloc_urb(0);
+    if (!hub->urb) return ENOMEM;
+
+    pipe = usb_rcvintpipe(hdev, endpoint->bEndpointAddress);
+    maxp = usb_maxpacket(hdev, pipe);
+
+    usb_fill_int_urb(hub->urb, hdev, pipe, hub->buffer, maxp, hub_irq, hub,
+                     endpoint->bInterval);
+
+    usb_submit_urb(hub->urb);
+
+    return 0;
+}
+
+static int hub_probe(struct usb_interface* intf, const struct usb_device_id* id)
+{
+    struct usb_hub* hub;
+    struct usb_device* hdev;
+    struct usb_host_interface* desc;
+
+    desc = intf->cur_altsetting;
+    hdev = intf->parent;
+
+    hub = malloc(sizeof(*hub));
+    if (!hub) return ENOMEM;
+
+    hub->hdev = hdev;
+    INIT_ASYNC_WORK(&hub->events, hub_event);
+    usb_get_dev(hdev);
+
+    intf->driver_data = hub;
+
+    if (hub_configure(hub, &desc->endpoint[0].desc) == 0) return 0;
+
+    usb_put_dev(hdev);
+
+    free(hub);
+    return ENODEV;
+}
+
+static const struct usb_device_id hub_id_table[] = {
+    {.match_flags = USB_DEVICE_ID_MATCH_INT_CLASS,
+     .bInterfaceClass = USB_CLASS_HUB},
+    {},
+};
+
+static struct usb_driver hub_driver = {
+    .name = "hub",
+
+    .probe = hub_probe,
+
+    .id_table = hub_id_table,
+};
+
+int usb_hub_init(void)
+{
+    if (usb_register_driver(&hub_driver) != 0) return -1;
 
     return 0;
 }

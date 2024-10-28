@@ -140,7 +140,7 @@ static int usb_register_bus(struct usb_bus* bus)
 
 static int register_roothub(struct usb_hcd* hcd)
 {
-    struct usb_device* hdev = hcd->self.roothub->hdev;
+    struct usb_device* hdev = hcd->self.roothub;
     struct usb_device_descriptor* descr;
     const int devnum = 1;
     int retval;
@@ -164,7 +164,6 @@ static int register_roothub(struct usb_hcd* hcd)
 int usb_hcd_add(struct usb_hcd* hcd, int irq)
 {
     struct usb_device* rhdev;
-    struct usb_hub* roothub;
     int retval = 0;
 
     list_add(&hcd->list, &hcd_list);
@@ -177,17 +176,26 @@ int usb_hcd_add(struct usb_hcd* hcd, int irq)
         retval = ENOMEM;
         goto rm_list;
     }
+    hcd->self.roothub = rhdev;
 
-    roothub = usb_create_hub(rhdev);
-    if (!roothub) {
-        retval = ENOMEM;
+    switch (hcd->speed) {
+    case HCD_USB11:
+        rhdev->speed = USB_SPEED_FULL;
+        break;
+    case HCD_USB2:
+        rhdev->speed = USB_SPEED_HIGH;
+        break;
+    case HCD_USB3:
+        rhdev->speed = USB_SPEED_SUPER;
+        break;
+    default:
+        retval = EINVAL;
         goto free_hdev;
     }
-    hcd->self.roothub = roothub;
 
     if (hcd->driver->setup) {
         retval = hcd->driver->setup(hcd);
-        if (retval) goto free_hub;
+        if (retval) goto free_hdev;
     }
 
     if (irq && hcd->driver->irq) {
@@ -195,10 +203,10 @@ int usb_hcd_add(struct usb_hcd* hcd, int irq)
         hcd->irq_hook = irq;
 
         retval = irq_setpolicy(irq, 0, &hcd->irq_hook);
-        if (retval) goto free_hub;
+        if (retval) goto free_hdev;
 
         retval = irq_enable(&hcd->irq_hook);
-        if (retval) goto free_hub;
+        if (retval) goto free_hdev;
     } else {
         hcd->irq = 0;
     }
@@ -218,7 +226,6 @@ rm_irq:
         irq_rmpolicy(&hcd->irq_hook);
     }
 
-free_hub:
 free_hdev:
     usb_put_dev(rhdev);
 
@@ -241,15 +248,33 @@ void usb_hcd_intr(unsigned int mask)
 
 void usb_hcd_poll_rh_status(struct usb_hcd* hcd)
 {
+    struct urb* urb;
     char buffer[6];
     int length;
+    int status;
 
     if (!hcd->driver->hub_status_data) return;
 
     length = hcd->driver->hub_status_data(hcd, buffer);
-    if (!length) return;
+    if (length > 0) {
+        urb = hcd->status_urb;
+        if (urb) {
+            hcd->status_urb = NULL;
 
-    usb_hub_handle_status_data(hcd->self.roothub, buffer, length);
+            if (urb->transfer_buffer_length >= length) {
+                status = 0;
+            } else {
+                status = EOVERFLOW;
+                length = urb->transfer_buffer_length;
+            }
+
+            urb->actual_length = length;
+            memcpy(urb->transfer_buffer, buffer, length);
+
+            usb_hcd_unlink_urb_from_ep(hcd, urb);
+            usb_hcd_giveback_urb(hcd, urb, status);
+        }
+    }
 }
 
 static unsigned ascii2desc(char const* s, u8* buf, unsigned len)
@@ -455,7 +480,20 @@ void usb_hcd_reset_endpoint(struct usb_device* udev,
     }
 }
 
-static int rh_queue_status(struct usb_hcd* hcd, struct urb* urb) { return 0; }
+static int rh_queue_status(struct usb_hcd* hcd, struct urb* urb)
+{
+    int retval;
+
+    if (hcd->status_urb) return EINVAL;
+
+    retval = usb_hcd_link_urb_to_ep(hcd, urb);
+    if (retval) return retval;
+
+    hcd->status_urb = urb;
+    urb->hc_priv = hcd;
+
+    return 0;
+}
 
 static int rh_urb_enqueue(struct usb_hcd* hcd, struct urb* urb)
 {

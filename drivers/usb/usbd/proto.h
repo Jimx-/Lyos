@@ -5,4 +5,6 @@
 void dwc2_scan(void);
 #endif
 
+int usb_hub_init(void);
+
 #endif

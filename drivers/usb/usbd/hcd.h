@@ -20,6 +20,8 @@ struct usb_hcd {
     const char* product_desc;
     int speed;
 
+    struct urb* status_urb;
+
     const struct hc_driver* driver;
 
     void* regs;

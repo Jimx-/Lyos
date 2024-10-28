@@ -18,6 +18,9 @@ struct usb_hub {
         struct usb_port_status port;
     } status;
 
+    int error;
+    int nerrors;
+
     unsigned long event_bits[1];
 
     int maxchild;
@@ -25,10 +28,6 @@ struct usb_hub {
 
     struct async_work events;
 };
-
-struct usb_hub* usb_create_hub(struct usb_device* hdev);
-void usb_hub_handle_status_data(struct usb_hub* hub, const char* buffer,
-                                int length);
 
 int usb_clear_port_feature(struct usb_device* hdev, int port1, int feature);
 

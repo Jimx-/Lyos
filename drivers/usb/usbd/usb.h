@@ -12,7 +12,6 @@
 #define USB_DEVICE_MAJOR 189
 
 struct usb_device;
-struct usb_hub;
 
 #define USB_MAXCHILDREN 31
 
@@ -36,6 +35,7 @@ struct usb_interface {
     struct kref kref;
     device_id_t dev_id;
     struct usb_device* parent;
+    void* driver_data;
 
     struct usb_host_interface* altsetting;
     struct usb_host_interface* cur_altsetting;
@@ -75,7 +75,7 @@ struct usb_bus {
     int devnum_next;
     bitchunk_t devmap[BITCHUNKS(128)];
 
-    struct usb_hub* roothub;
+    struct usb_device* roothub;
 };
 
 struct usb_device {
@@ -120,6 +120,18 @@ struct usb_device* usb_alloc_dev(struct usb_device* parent, struct usb_bus* bus,
                                  unsigned int port1);
 struct usb_device* usb_get_dev(struct usb_device* udev);
 void usb_put_dev(struct usb_device* udev);
+
+struct usb_driver {
+    const char* name;
+    struct list_head list;
+
+    int (*probe)(struct usb_interface* intf, const struct usb_device_id* id);
+
+    const struct usb_device_id* id_table;
+};
+
+int usb_register_driver(struct usb_driver* driver);
+void usb_probe_interface(struct usb_interface* intf);
 
 const char* usb_speed_string(enum usb_device_speed speed);
 
@@ -257,6 +269,15 @@ usb_pipe_endpoint(struct usb_device* dev, unsigned int pipe)
     struct usb_host_endpoint** eps;
     eps = usb_pipein(pipe) ? dev->ep_in : dev->ep_out;
     return eps[usb_pipeendpoint(pipe)];
+}
+
+static inline u16 usb_maxpacket(struct usb_device* udev, int pipe)
+{
+    struct usb_host_endpoint* ep = usb_pipe_endpoint(udev, pipe);
+
+    if (!ep) return 0;
+
+    return usb_endpoint_maxp(&ep->desc);
 }
 
 void usb_enable_endpoint(struct usb_device* dev, struct usb_host_endpoint* ep,

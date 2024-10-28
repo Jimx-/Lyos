@@ -1,7 +1,10 @@
 #include <lyos/const.h>
+#include <lyos/sysutils.h>
 #include <lyos/usb.h>
 
 #include "usb.h"
+
+static DEF_LIST(driver_list);
 
 int usb_match_device(struct usb_device* dev, const struct usb_device_id* id)
 {
@@ -63,5 +66,69 @@ int usb_match_one_id_intf(struct usb_device* dev,
         (id->bInterfaceNumber != intf->desc.bInterfaceNumber))
         return FALSE;
 
-    return FALSE;
+    return TRUE;
+}
+
+int usb_match_one_id(struct usb_interface* interface,
+                     const struct usb_device_id* id)
+{
+    struct usb_host_interface* intf;
+    struct usb_device* dev;
+
+    if (id == NULL) return 0;
+
+    intf = interface->cur_altsetting;
+    dev = interface->parent;
+
+    if (!usb_match_device(dev, id)) return 0;
+
+    return usb_match_one_id_intf(dev, intf, id);
+}
+
+const struct usb_device_id* usb_match_id(struct usb_interface* interface,
+                                         const struct usb_device_id* id)
+{
+    if (id == NULL) return NULL;
+
+    for (; id->idVendor || id->idProduct || id->bDeviceClass ||
+           id->bInterfaceClass;
+         id++) {
+        if (usb_match_one_id(interface, id)) return id;
+    }
+
+    return NULL;
+}
+
+const struct usb_device_id* usb_device_match_id(struct usb_device* udev,
+                                                const struct usb_device_id* id)
+{
+    if (!id) return NULL;
+
+    for (; id->idVendor || id->idProduct; id++) {
+        if (usb_match_device(udev, id)) return id;
+    }
+
+    return NULL;
+}
+
+int usb_register_driver(struct usb_driver* driver)
+{
+    list_add(&driver->list, &driver_list);
+    return 0;
+}
+
+void usb_probe_interface(struct usb_interface* intf)
+{
+    struct usb_driver* drv;
+    const struct usb_device_id* id;
+    int retval;
+
+    list_for_each_entry(drv, &driver_list, list)
+    {
+        id = usb_match_id(intf, drv->id_table);
+        if (id) {
+            retval = drv->probe(intf, id);
+            if (retval == 0) break;
+        }
+    }
 }

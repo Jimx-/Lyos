@@ -431,6 +431,7 @@ int usb_set_configuration(struct usb_device* dev, int configuration)
 
         usb_register_interface(intf, configuration,
                                intf->cur_altsetting->desc.bInterfaceNumber);
+        usb_probe_interface(intf);
     }
 
     return 0;

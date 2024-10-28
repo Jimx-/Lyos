@@ -130,6 +130,8 @@ static int usbd_init(void)
     boot_params = sysinfo->boot_params;
 #endif
 
+    usb_hub_init();
+
 #if CONFIG_USB_PCI
     hcd_pci_init();
 #endif
