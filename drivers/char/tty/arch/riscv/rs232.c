@@ -118,6 +118,8 @@ struct rs232 {
 #define istart(rs) writeb((rs)->modem_ctl_port, MC_OUT2 | MC_RTS | MC_DTR)
 #define istop(rs)  writeb((rs)->modem_ctl_port, MC_OUT2 | MC_DTR)
 
+static const char* const ns16550a_compat[] = {"ns16550a", NULL};
+
 static void rs_start_rx(struct uart_port* uport)
 {
     struct rs232* rs = uport_to_rs232(uport);
@@ -267,7 +269,7 @@ static int fdt_scan_uart(void* blob, unsigned long offset, const char* name,
     int irq;
     int ret;
 
-    if (strlen(name) < 4 || memcmp(name, "uart", 4) != 0) return 0;
+    if (!of_flat_dt_match(blob, offset, ns16550a_compat)) return 0;
 
     ret = of_address_parse_one(blob, offset, 0, &base, &size);
     if (ret < 0) return 0;

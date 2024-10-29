@@ -31,7 +31,6 @@
 #define MINSIZE  8
 #define MAXSIZE  ((SLABSIZE - 1 + MINSIZE / OBJ_ALIGN) * OBJ_ALIGN)
 
-
 struct slabheader {
     struct list_head list;
     bitchunk_t used_mask[BITCHUNKS(ARCH_PG_SIZE / MINSIZE)];

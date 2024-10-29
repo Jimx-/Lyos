@@ -51,7 +51,7 @@ pde_t trampoline_pgd[ARCH_VM_DIR_ENTRIES]
     __attribute__((aligned(ARCH_PG_SIZE)));
 /* create page middle directories if it is not folded */
 #ifndef __PAGETABLE_PMD_FOLDED
-#define NUM_INIT_PMDS (((uintptr_t)-KERNEL_VMA >> ARCH_PGD_SHIFT) - 2)
+#define NUM_INIT_PMDS (((uintptr_t) - KERNEL_VMA >> ARCH_PGD_SHIFT) - 2)
 pmd_t initial_pmd[ARCH_VM_PMD_ENTRIES * NUM_INIT_PMDS]
     __attribute__((__section__(".unpaged_data")))
     __attribute__((aligned(ARCH_PG_SIZE)));
@@ -195,7 +195,7 @@ void pg_map(phys_bytes phys_addr, void* vir_addr, void* vir_end, kinfo_t* pk)
         }
 
         pte_t* pte = pte_offset(pmde, (unsigned long)vir_addr);
-        *pte = pfn_pte(ph >> ARCH_PG_SHIFT, RISCV_PG_EXEC_WRITE);
+        set_pte(pte, pfn_pte(ph >> ARCH_PG_SHIFT, RISCV_PG_EXEC_WRITE));
 
         vir_addr += ARCH_PG_SIZE;
         if (phys_addr != 0) phys_addr += ARCH_PG_SIZE;

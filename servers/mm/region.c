@@ -34,7 +34,7 @@
 #define DBG(x)
 #endif
 
-#define FREE_REGION_FAILED ((vir_bytes)-1)
+#define FREE_REGION_FAILED ((vir_bytes) - 1)
 
 static inline size_t phys_slot(vir_bytes offset)
 {
@@ -291,12 +291,12 @@ vir_bytes region_find_free_region(struct mmproc* mmp, vir_bytes minv,
         }                                                     \
     } while (0)
 
-#define ALLOC_REGION(start, end)                                      \
-    do {                                                              \
-        TRY_ALLOC_REGION((start) + ARCH_PG_SIZE, (end)-ARCH_PG_SIZE); \
-        if (!found) {                                                 \
-            TRY_ALLOC_REGION(start, end);                             \
-        }                                                             \
+#define ALLOC_REGION(start, end)                                        \
+    do {                                                                \
+        TRY_ALLOC_REGION((start) + ARCH_PG_SIZE, (end) - ARCH_PG_SIZE); \
+        if (!found) {                                                   \
+            TRY_ALLOC_REGION(start, end);                               \
+        }                                                               \
     } while (0)
 
     if (!last) {

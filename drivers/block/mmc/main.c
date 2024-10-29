@@ -17,7 +17,7 @@
 
 #define NAME "mmcblk"
 
-#define MAX_THREADS 1
+#define MAX_THREADS 8
 #define MAX_DEVICES 4
 
 #if CONFIG_OF

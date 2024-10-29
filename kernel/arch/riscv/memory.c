@@ -247,7 +247,7 @@ int arch_reply_kern_mapping(int index, void* vir_addr)
 {
     char* usermapped_start = (char*)*(&_usermapped);
 
-#define USER_PTR(x) (((char*)(x)-usermapped_start) + (char*)vir_addr)
+#define USER_PTR(x) (((char*)(x) - usermapped_start) + (char*)vir_addr)
 
     if (index == KM_USERMAPPED) {
         usermapped_offset = (char*)vir_addr - usermapped_start;
@@ -309,6 +309,9 @@ int arch_vmctl(MESSAGE* m, struct proc* p)
         return 0;
     case VMCTL_SET_ADDRESS_SPACE:
         setptbr(p, (phys_bytes)m->VMCTL_PHYS_ADDR);
+        return 0;
+    case VMCTL_FLUSHTLB:
+        flush_tlb();
         return 0;
     }
 

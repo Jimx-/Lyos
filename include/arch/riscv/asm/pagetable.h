@@ -71,12 +71,18 @@ static inline int pude_none(pud_t pude) { return pud_val(pude) == 0; }
 
 static inline int pude_bad(pud_t pude) { return !pude_present(pude); }
 
-static inline void pude_clear(pud_t* pude) { *pude = __pud(0); }
+static inline void set_pude(pud_t* pudep, pud_t pude)
+{
+    *(volatile pud_t*)pudep = pude;
+}
+
+static inline void pude_clear(pud_t* pude) { set_pude(pude, __pud(0)); }
 
 static inline void pude_populate(pud_t* pude, phys_bytes pmd_phys)
 {
     unsigned long pfn = pmd_phys >> ARCH_PG_SHIFT;
-    *pude = __pud((pfn << RISCV_PG_PFN_SHIFT) | _RISCV_PG_TABLE);
+    *(volatile pud_t*)pude =
+        __pud((pfn << RISCV_PG_PFN_SHIFT) | _RISCV_PG_TABLE);
 }
 
 static inline pmd_t* pmd_offset(pud_t* pmd, unsigned long addr)
@@ -98,12 +104,18 @@ static inline int pmde_bad(pmd_t pmde)
     return !pmde_present(pmde) || (pmd_val(pmde) & _RISCV_PG_LEAF);
 }
 
-static inline void pmde_clear(pmd_t* pmde) { *pmde = __pmd(0); }
+static inline void set_pmde(pmd_t* pmdep, pmd_t pmde)
+{
+    *(volatile pmd_t*)pmdep = pmde;
+}
+
+static inline void pmde_clear(pmd_t* pmde) { set_pmde(pmde, __pmd(0)); }
 
 static inline void pmde_populate(pmd_t* pmde, unsigned long pt_phys)
 {
     unsigned long pfn = pt_phys >> ARCH_PG_SHIFT;
-    *pmde = __pmd((pfn << RISCV_PG_PFN_SHIFT) | _RISCV_PG_TABLE);
+    *(volatile pmd_t*)pmde =
+        __pmd((pfn << RISCV_PG_PFN_SHIFT) | _RISCV_PG_TABLE);
 }
 
 static inline pte_t* pte_offset(pmd_t* pt, unsigned long addr)
@@ -126,14 +138,14 @@ static inline int pte_present(pte_t pte)
 #define pgd_addr_end(addr, end)                                          \
     ({                                                                   \
         vir_bytes __boundary = ((addr) + ARCH_PGD_SIZE) & ARCH_PGD_MASK; \
-        (__boundary - 1 < (end)-1) ? __boundary : (end);                 \
+        (__boundary - 1 < (end) - 1) ? __boundary : (end);               \
     })
 
 #ifndef pmd_addr_end
 #define pmd_addr_end(addr, end)                                          \
     ({                                                                   \
         vir_bytes __boundary = ((addr) + ARCH_PMD_SIZE) & ARCH_PMD_MASK; \
-        (__boundary - 1 < (end)-1) ? __boundary : (end);                 \
+        (__boundary - 1 < (end) - 1) ? __boundary : (end);               \
     })
 #endif
 
