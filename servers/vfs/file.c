@@ -296,9 +296,6 @@ int get_fd(struct fproc* fp, int start, mode_t bits, int* fd,
         *fd = i;
     }
 
-    if (GET_BIT(fp->files->close_on_exec, *fd)) {
-        printl("%d %d\n", fp->endpoint, *fd);
-    }
     assert(!GET_BIT(fp->files->close_on_exec, *fd));
 
     if (!fpp) return 0;

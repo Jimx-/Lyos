@@ -40,7 +40,7 @@
 #include "global.h"
 #include "thread.h"
 
-//#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 #define DEB(x)       \
     printl("VFS: "); \

@@ -139,6 +139,10 @@ int do_dup(void)
     int newfd = self->msg_in.NEWFD;
     int retval = 0;
 
+    if (newfd != fd && newfd >= 0 && newfd < fproc->files->max_fds) {
+        if (fproc->files->filp[newfd] != NULL) close_fd(fproc, newfd, FALSE);
+    }
+
     struct file_desc* filp = get_filp(fproc, fd, RWL_READ);
     if (!filp) return -EBADF;
 
@@ -147,19 +151,13 @@ int do_dup(void)
         return newfd;
     }
 
-    if (newfd == -1) {
-        /* find a free slot in PROCESS::filp[] */
-        retval = get_fd(fproc, 0, 0, &newfd, NULL);
-        if (retval) {
-            unlock_filp(filp);
-            return -retval;
-        }
-    }
+    if (newfd == -1) newfd = 0;
 
-    if (fproc->files->filp[newfd] != NULL) {
-        /* close the file */
-        self->msg_out.FD = newfd;
-        close_fd(fproc, newfd, FALSE);
+    /* find a free slot in PROCESS::filp[] */
+    retval = get_fd(fproc, newfd, 0, &newfd, NULL);
+    if (retval) {
+        unlock_filp(filp);
+        return -retval;
     }
 
     filp->fd_cnt++;

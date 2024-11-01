@@ -84,6 +84,7 @@ cp -rf $DESTDIR/usr/lib/libEGL.so.1.0.0 /$MOUNT_POINT/usr/lib/
 cp -rf $DESTDIR/usr/lib/libgbm.so.1.0.0 /$MOUNT_POINT/usr/lib/
 cp -rf $DESTDIR/usr/lib/dri/* /$MOUNT_POINT/usr/lib/dri/
 cp -rf sysroot/etc/* /$MOUNT_POINT/etc/
+cp -rf sysroot/usr/lib/udev/rules.d/* /$MOUNT_POINT/usr/lib/udev/rules.d/
 # cp -rf /$MOUNT_POINT/home/jimx/profile.out .
 #cp -rf sysroot/boot/* /$MOUNT_POINT/boot/
 sync

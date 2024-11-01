@@ -152,6 +152,10 @@ static int publish_device(struct device* dev)
         return retval;
     }
 
+    snprintf(label, PATH_MAX, "%s.devid", device_root);
+    retval = sysfs_publish_u32(label, (u32)dev->id, SF_PRIV_OVERWRITE);
+    if (retval) return retval;
+
     snprintf(label, PATH_MAX, "%s.uevent", device_root);
     if ((retval =
              sysfs_init_dyn_attr(&dev_uevent_attr, label, SF_PRIV_OVERWRITE,
