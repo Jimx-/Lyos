@@ -257,6 +257,7 @@ enum msgtype {
     DM_REPLY,
     DM_BUS_ATTR_REPLY,
     DM_DEVICE_ATTR_REPLY,
+    DM_BIND_DEVICE,
 
     /* message type for fs request */
     FSREQ_RET = VFS_REQ_BASE,

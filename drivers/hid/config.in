@@ -13,13 +13,25 @@ menuconfig HID_DEV
 if HID_DEV
 
 config KEYBOARD_ATKBD
-    tristate "AT keyboard"
+    bool "AT keyboard"
     default y
     help
       Say Y here if you want to use a standard AT or PS/2 keyboard. Usually
       you'll need this, unless you have a different type keyboard (USB, ADB
       or other). This also works for AT and PS/2 keyboards connected over a
       PS/2 to serial converter.
+
+      If unsure, say Y.
+
+config USB_HID
+    bool "USB HID transport layer"
+    default y
+    depends on USB
+    help
+      Say Y here if you want to connect USB keyboards,
+      mice, joysticks, graphic tablets, or any other HID based devices
+      to your computer via USB, as well as Uninterruptible Power Supply
+      (UPS) and monitor control devices.
 
       If unsure, say Y.
 

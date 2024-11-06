@@ -77,6 +77,7 @@ cp -rf $DESTDIR/usr/bin/login /$MOUNT_POINT/usr/bin/
 cp -rf $DESTDIR/usr/bin/vim /$MOUNT_POINT/usr/bin/
 cp -rf $DESTDIR/usr/bin/strace /$MOUNT_POINT/usr/bin/
 cp -rf $DESTDIR/usr/bin/lydm /$MOUNT_POINT/usr/bin/
+cp -rf $DESTDIR/sbin/usbhid /$MOUNT_POINT/sbin/
 #cp -rf $DESTDIR/usr/ /$MOUNT_POINT/
 cp -rf $DESTDIR/usr/lib/libc.so /$MOUNT_POINT/usr/lib/
 cp -rf $DESTDIR/lib/ld-lyos.so /$MOUNT_POINT/lib/

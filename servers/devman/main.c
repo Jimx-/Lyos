@@ -125,6 +125,9 @@ static void devfs_message_hook(MESSAGE* msg)
     case DM_DEVICE_ATTR_ADD:
         msg->RETVAL = do_device_attr_add(msg);
         break;
+    case DM_BIND_DEVICE:
+        msg->RETVAL = do_bind_device(msg);
+        break;
     case SYSFS_DYN_SHOW:
     case SYSFS_DYN_STORE:
         sysfs_handle_dyn_attr(msg);

@@ -1,0 +1,5 @@
+menu "USB HID support"
+    depends on USB
+config USB_KBD
+    tristate "USB HIDBP Keyboard (simple Boot) support"
+    depends on USB

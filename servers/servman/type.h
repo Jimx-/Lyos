@@ -45,6 +45,8 @@ struct sproc {
 
     int nr_domain;
     int domain[NR_DOMAIN];
+
+    int devid;
 };
 
 struct boot_priv {

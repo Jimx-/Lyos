@@ -80,6 +80,8 @@ int init_sproc(struct sproc* sp, struct service_up_req* up_req,
         }
     }
 
+    sp->devid = up_req->devid;
+
     if (up_req->class) {
         classlen = min(PROC_NAME_LEN, up_req->classlen);
         retval = data_copy(SELF, sp->class, source, up_req->class, classlen);

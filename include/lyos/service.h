@@ -56,6 +56,8 @@ struct service_up_req {
 
     int nr_domain;
     int domain[NR_DOMAIN];
+
+    int devid;
 };
 
 struct pci_acl {

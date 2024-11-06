@@ -553,3 +553,5 @@ int do_device_attr_add(MESSAGE* m)
     m->ATTRID = attr->id;
     return 0;
 }
+
+int do_bind_device(MESSAGE* m) { return 0; }

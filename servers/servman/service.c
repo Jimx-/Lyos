@@ -29,6 +29,8 @@
 #include <lyos/sysutils.h>
 #include <sys/syslimits.h>
 
+#include <libdevman/libdevman.h>
+
 #include "proto.h"
 #include "const.h"
 #include "type.h"
@@ -189,6 +191,20 @@ static int activate_service(struct sproc* sp)
     sp->pci_acl.endpoint = sp->endpoint;
     if (sp->pci_acl.nr_pci_class > 0 || sp->pci_acl.nr_pci_id > 0) {
         pci_set_acl(&sp->pci_acl);
+    }
+
+    if (sp->devid != NO_DEVICE_ID) {
+        MESSAGE m;
+        int retval;
+
+        memset(&m, 0, sizeof(m));
+        m.type = DM_BIND_DEVICE;
+        m.PROC_NR = sp->endpoint;
+        m.DEVICE = sp->devid;
+
+        retval = send_recv(BOTH, TASK_DEVMAN, &m);
+        if (!retval) retval = m.RETVAL;
+        if (retval) return retval;
     }
 
     return 0;

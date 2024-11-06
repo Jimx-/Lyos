@@ -9,15 +9,19 @@
 #include <lyos/ipc.h>
 #include <lyos/service.h>
 
-char* req_path = NULL;
-char* req_args = NULL;
-char* req_label = NULL;
-char* config_path = NULL;
-char cmdline[4096];
+#include <libdevman/libdevman.h>
+
+static char* req_path = NULL;
+static char* req_args = NULL;
+static char* req_label = NULL;
+static char* config_path = NULL;
+static char cmdline[4096];
+static device_id_t devman_id = NO_DEVICE_ID;
 
 #define ARG_ARGS   "--args"
 #define ARG_CONFIG "--config"
 #define ARG_LABEL  "--label"
+#define ARG_DEVID  "--devid"
 
 static char* requests[] = {"up", NULL};
 
@@ -34,8 +38,10 @@ static void print_usage(char* name, char* reason)
     fprintf(stderr, "Error: %s\n", reason);
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "    %s up <server> [%s <path>] [%s <args>] [%s <label>]\n",
-            name, ARG_CONFIG, ARG_ARGS, ARG_LABEL);
+    fprintf(stderr,
+            "    %s up <server> [%s <path>] [%s <args>] [%s <label>] [%s "
+            "<devid>]\n",
+            name, ARG_CONFIG, ARG_ARGS, ARG_LABEL, ARG_DEVID);
     fprintf(stderr, "\n");
 }
 
@@ -82,6 +88,8 @@ static int parse_cmd(int argc, char* argv[])
             req_args = argv[++index];
         } else if (!strcmp(argv[index], ARG_LABEL)) {
             req_label = argv[++index];
+        } else if (!strcmp(argv[index], ARG_DEVID)) {
+            devman_id = atoi(argv[++index]);
         }
     }
 
@@ -134,6 +142,8 @@ int main(int argc, char* argv[])
         } else {
             up_req.labellen = 0;
         }
+
+        up_req.devid = devman_id;
 
         msg.BUF = &up_req;
         break;

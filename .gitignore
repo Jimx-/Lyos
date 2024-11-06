@@ -76,7 +76,6 @@ sysroot/include/
 sysroot/lib/
 sysroot/sbin/
 sysroot/share/
-sysroot/usr/
 
 init/init
 init/init.map
